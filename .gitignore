@@ -1,2 +1,2 @@
-*.sqlite
+cf.sqlite
 __pycache__
