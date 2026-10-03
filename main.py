@@ -7,20 +7,24 @@ import re
 import shlex
 import sqlite3
 import sys
+import argparse
 
 
-path = "cf.sqlite"
+cache_dir = Path.home() / ".cache" / "codeforces_fzf"
+cache_dir.mkdir(parents=True, exist_ok=True)
+path = cache_dir / "cf.sqlite"
 
 def getResponse():
+    print("making request")
     url = "https://codeforces.com/api/problemset.problems"
     response = urllib.request.urlopen(url)
     data = json.loads(response.read().decode("utf-8"))
     return data["result"]["problems"]
 
 def parse_search_query(query_str: str) -> dict:
-    range_pattern = re.compile(r"^r:(?!-$)(?:(\d+)?-(\d+)?|(\d+))$")
-    include_tag_pattern = re.compile(r"^t:(.+)$")
-    exclude_tag_pattern = re.compile(r"^!t:(.+)$")
+    range_pattern = re.compile(r"^r:(?!-$)(?:(\d+)?-(\d+)?|(\d+))?$")
+    include_tag_pattern = re.compile(r"^t:(.+)?$")
+    exclude_tag_pattern = re.compile(r"^!t:(.+)?$")
     min_rating, max_rating = None, None
     include_tags, exclude_tags = [], []
     name_tokens = []
@@ -46,15 +50,19 @@ def parse_search_query(query_str: str) -> dict:
         # Check included tags (t:dp,math)
         m_inc = include_tag_pattern.match(token)
         if m_inc:
-            tags = [t.strip().lower() for t in m_inc.group(1).split(",") if t.strip()]
-            include_tags.extend(tags)
+            tag_content = m_inc.group(1)
+            if tag_content :
+                tags = [t.strip().lower() for t in tag_content.split(",") if t.strip()]
+                include_tags.extend(tags)
             continue
 
         # Check excluded tags (!t:graphs,trees)
         m_exc = exclude_tag_pattern.match(token)
         if m_exc:
-            tags = [t.strip().lower() for t in m_exc.group(1).split(",") if t.strip()]
-            exclude_tags.extend(tags)
+            tag_content = m_exc.group(1)
+            if tag_content :
+                tags = [t.strip().lower() for t in tag_content.split(",") if t.strip()]
+                exclude_tags.extend(tags)
             continue
 
         # Remaining tokens are treated as name search
@@ -71,13 +79,16 @@ def parse_search_query(query_str: str) -> dict:
 
 
 class DataBase:
-    def __init__(self, p=path):
-        test=Path(path).is_file()
+    def __init__(self, p=path,refresh=False):
+        test=Path(path).is_file() 
         self.path = p
         self.con = sqlite3.connect(self.path)
         self.cur = self.con.cursor()
         if not test:
             self.create()
+            self.insert(getResponse())
+        elif refresh:
+            self.clear()
             self.insert(getResponse())
 
 
@@ -98,6 +109,10 @@ class DataBase:
         )
         """
         self.cur.execute(create_stmt)
+        self.con.commit()
+
+    def clear(self):
+        self.cur.execute("DELETE FROM problem")
         self.con.commit()
 
     def insert(self, problems):
@@ -176,7 +191,7 @@ class DataBase:
         # Print formatted lines for fzf
         for contest_id, index, name, rating, tags in rows:
             rating_str = f"[{rating}]" if rating else "[Unrated]"
-            print(f"{contest_id}/{index} | {name} {rating_str} | {tags}")
+            print(f"{contest_id}/{index}:{name}")
 
 
     def close(self):
@@ -184,6 +199,12 @@ class DataBase:
 
 
 if __name__ == "__main__":
-    search_input = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "r:1200-1600 t:dp !t:graphs"
-    d=DataBase()
-    d.search_problems(search_input)
+    parse=argparse.ArgumentParser()
+    parse.add_argument("-r","--refresh",
+                       action="store_true",
+                       help="refresh the database",
+                       )
+    parse.add_argument("query",type=str,help="the query to search for",nargs="?",default="")
+    args=parse.parse_args()
+    d=DataBase(refresh=args.refresh)
+    d.search_problems(args.query)
