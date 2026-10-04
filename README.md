@@ -24,5 +24,7 @@ Simply run:
 
 ## Future Feature
 Add tmux intergration 
+
 Add preview
+
 Add more filter 
