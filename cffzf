@@ -8,8 +8,8 @@ SERVER_PID=""
 if ! curl -s "$SERVER_URL/" > /dev/null; then
     echo "Starting Codeforces background server..."
     python3 cf_svr.py &>/dev/null &
+    sleep 0.1
     SERVER_PID="$!"
-    sleep 1 # Give it a second to boot up
 fi
 
 CHOICE=$(curl -s "${SERVER_URL}/search" | fzf \

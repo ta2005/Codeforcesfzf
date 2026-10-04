@@ -8,7 +8,7 @@ import shlex
 import sqlite3
 import sys
 import argparse
-from http.server import HTTPServer , BaseHTTPRequestHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 cache_dir = Path.home() / ".cache" / "codeforces_fzf"
 cache_dir.mkdir(parents=True, exist_ok=True)
@@ -24,6 +24,46 @@ def getResponse():
 
 
 def parse_search_query(query_str: str) -> dict:
+    # of couse 800 and 3500 must be max and min rating
+    know_tags = [
+        "2_sat",
+        "binary_search",
+        "bitmasks",
+        "brute_force",
+        "chinese_remainder_theorem",
+        "combinatorics",
+        "communication",
+        "constructive_algorithms",
+        "data_structures",
+        "dfs_and_similar",
+        "divide_and_conquer",
+        "dp",
+        "dsu",
+        "expression_parsing",
+        "fft",
+        "flows",
+        "games",
+        "geometry",
+        "graph_matchings",
+        "graphs",
+        "greedy",
+        "hashing",
+        "implementation",
+        "interactive",
+        "math",
+        "matrices",
+        "meet_in_the_middle",
+        "number_theory",
+        "probabilities",
+        "schedules",
+        "shortest_paths",
+        "sortings",
+        "string_suffix_structures",
+        "strings",
+        "ternary_search",
+        "trees",
+        "two_pointers",
+    ]
     range_pattern = re.compile(r"^r:(?!-$)(?:(\d+)?-(\d+)?|(\d+))?$")
     include_tag_pattern = re.compile(r"^t:(.+)?$")
     exclude_tag_pattern = re.compile(r"^!t:(.+)?$")
@@ -43,9 +83,17 @@ def parse_search_query(query_str: str) -> dict:
             if exact is not None:
                 min_rating = int(exact)
                 max_rating = int(exact)
+                if min_rating is not None and ( min_rating < 800  or min_rating > 3500):
+                    min_rating = None
+                if max_rating is not None and ( max_rating < 800 or max_rating > 3500 ):
+                    max_rating = None
             else:
                 min_rating = int(low) if low else None
                 max_rating = int(high) if high else None
+                if min_rating is not None and ( min_rating < 800  or min_rating > 3500):
+                    min_rating = None
+                if max_rating is not None and ( max_rating < 800 or max_rating > 3500 ):
+                    max_rating = None
 
             continue
 
@@ -54,7 +102,11 @@ def parse_search_query(query_str: str) -> dict:
         if m_inc:
             tag_content = m_inc.group(1)
             if tag_content:
-                tags = [t.strip().lower() for t in tag_content.split(",") if t.strip()]
+                tags = [
+                    t.strip().lower()
+                    for t in tag_content.split(",")
+                    if t.strip().lower()  in know_tags
+                ]
                 include_tags.extend(tags)
             continue
         # Check excluded tags (!t:graphs,trees)
@@ -62,7 +114,11 @@ def parse_search_query(query_str: str) -> dict:
         if m_exc:
             tag_content = m_exc.group(1)
             if tag_content:
-                tags = [t.strip().lower() for t in tag_content.split(",") if t.strip()]
+                tags = [
+                    t.strip().lower()
+                    for t in tag_content.split(",")
+                    if t.strip().lower() in know_tags
+                ]
                 exclude_tags.extend(tags)
             continue
 
@@ -79,12 +135,12 @@ def parse_search_query(query_str: str) -> dict:
 
 
 class DataBase:
-    def __init__(self, p=path, refresh=False,show_tags=False):
+    def __init__(self, p=path, refresh=False, show_tags=False):
         test = Path(path).is_file()
         self.path = p
         self.con = sqlite3.connect(self.path)
         self.cur = self.con.cursor()
-        self.show_tags=show_tags
+        self.show_tags = show_tags
         if not test:
             self.create()
             self.insert(getResponse())
@@ -97,7 +153,6 @@ class DataBase:
     def refresh(self):
         self.clear()
         self.insert(getResponse())
-
 
     def create(self):
         create_stmt = """
@@ -157,6 +212,7 @@ class DataBase:
     def build_sql_query(parsed: dict) -> tuple[str, dict]:
         conditions = []
         params = {}
+        # print(parsed)
 
         # Rating filter
         if parsed["min_rating"] is not None:
@@ -203,23 +259,25 @@ class DataBase:
         rows = self.cur.fetchall()
 
         # Print formatted lines for fzf
-        res=""
+        res = ""
         for contest_id, index, name, rating, tags in rows:
             rating_str = f"[{rating}]" if rating else "[Unrated]"
             if self.show_tags:
-                res+=f"{contest_id}/{index}:{rating_str} | {tags} | {name}\n"
+                res += f"{contest_id}/{index}:{rating_str} | {tags} | {name}\n"
             else:
-                res+=f"{contest_id}/{index}:{name}\n"
+                res += f"{contest_id}/{index}:{name}\n"
         return res
 
     def close(self):
         self.con.close()
+
     def toggle_tags(self):
         self.show_tags = not self.show_tags
 
+
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        parsed_url=up.urlparse(self.path)
+        parsed_url = up.urlparse(self.path)
         path = parsed_url.path
         if path == "/refresh":
             self.server.db.refresh()
@@ -232,16 +290,17 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Toggle layout")
         elif path == "/search":
-            qr=up.parse_qs(parsed_url.query)
+            qr = up.parse_qs(parsed_url.query)
             search = qr.get("q", [""])[0]
             self.send_response(200)
             self.end_headers()
             results = self.server.db.search_problems(search)
-            self.wfile.write(results.encode('utf-8'))
+            self.wfile.write(results.encode("utf-8"))
         else:
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"Endpoint Not Found")
+
 
 class FzfServer(HTTPServer):
     def __init__(self, server_address, handler_class):

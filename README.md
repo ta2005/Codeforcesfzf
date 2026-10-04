@@ -21,3 +21,8 @@ Simply run:
 `./fzf.sh`
 
 *(If the server isn't running yet, fzf.sh will automatically start it in the background for you!)*
+
+## Future Feature
+Add tmux intergration 
+Add preview
+Add more filter 
