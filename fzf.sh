@@ -6,7 +6,7 @@ SERVER_URL="http://localhost:6713"
 # 1. Start the Python server in the background if it isn't already running!
 if ! curl -s "$SERVER_URL/" > /dev/null; then
     echo "Starting Codeforces background server..."
-    python3 main.py &
+    python3 main.py &>/dev/null &
     sleep 1 # Give it a second to boot up
 fi
 
