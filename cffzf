@@ -3,9 +3,12 @@
 VIEWER=${BROWSER:-librewolf}
 SERVER_URL="http://localhost:6713"
 
+SERVER_PID=""
+
 if ! curl -s "$SERVER_URL/" > /dev/null; then
     echo "Starting Codeforces background server..."
     python3 cf_svr.py &>/dev/null &
+    SERVER_PID="$!"
     sleep 1 # Give it a second to boot up
 fi
 
@@ -28,3 +31,8 @@ if [[ -n "$url" ]]; then
 	full_url="https://codeforces.com/problemset/problem/${url}"
 	swaymsg exec " ${VIEWER} \"${full_url}\" "
 fi
+
+if [[ -n "$SERVER_PID" ]];then
+    kill "$SERVER_PID"
+fi
+
