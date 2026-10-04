@@ -1,0 +1,30 @@
+#!/bin/bash
+
+VIEWER=${BROWSER:-librewolf}
+SERVER_URL="http://localhost:6713"
+
+if ! curl -s "$SERVER_URL/" > /dev/null; then
+    echo "Starting Codeforces background server..."
+    python3 cf_svr.py &>/dev/null &
+    sleep 1 # Give it a second to boot up
+fi
+
+CHOICE=$(curl -s "${SERVER_URL}/search" | fzf \
+	--disabled \
+	--header 'Search (e.g. r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
+	--bind 'change:reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
+	--bind 'ctrl-r:execute-silent(curl -s "'$SERVER_URL'/refresh")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
+	--bind 'ctrl-s:execute-silent(curl -s "'$SERVER_URL'/toggle")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
+	--delimiter ':' \
+	--accept-nth 1 \
+	--preview 'echo "Problem Info: {1}"' \
+	--expect=enter)
+
+# the key to be later used to open the problem in tmux 
+key=$(head -1 <<<"$CHOICE")
+url=$(head -2 <<<"$CHOICE" | tail -1)
+
+if [[ -n "$url" ]]; then
+	full_url="https://codeforces.com/problemset/problem/${url}"
+	swaymsg exec " ${VIEWER} \"${full_url}\" "
+fi

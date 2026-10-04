@@ -1,7 +1,7 @@
 #!/bin/python
 from pathlib import Path
 import urllib.request
-import urllib.parse
+import urllib.parse as up
 import json
 import re
 import shlex
@@ -89,11 +89,15 @@ class DataBase:
             self.create()
             self.insert(getResponse())
         elif refresh:
-            self.clear()
-            self.insert(getResponse())
+            self.refresh()
 
     def exists(path):
         return Path(path).is_file()
+
+    def refresh(self):
+        self.clear()
+        self.insert(getResponse())
+
 
     def create(self):
         create_stmt = """
@@ -210,20 +214,34 @@ class DataBase:
 
     def close(self):
         self.con.close()
+    def toggle_tags(self):
+        self.show_tags = not self.show_tags
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        qr=urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        search = qr.get("q", [""])[0]
-        toggle = "toggle" in qr
-        ref = "ref" in qr
-        if ref:
-            self.server.db.clear()
-            self.server.db.insert(getResponse())
-        self.send_response(200)
-        self.end_headers()
-        results = self.server.db.search_problems(search, show_tags=toggle)
-        self.wfile.write(results.encode('utf-8'))
+        parsed_url=up.urlparse(self.path)
+        path = parsed_url.path
+        if path == "/refresh":
+            self.server.db.refresh()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"refreshed layout")
+        elif path == "/toggle":
+            self.server.db.toggle_tags()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"Toggle layout")
+        elif path == "/search":
+            qr=up.parse_qs(parsed_url.query)
+            search = qr.get("q", [""])[0]
+            self.send_response(200)
+            self.end_headers()
+            results = self.server.db.search_problems(search)
+            self.wfile.write(results.encode('utf-8'))
+        else:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Endpoint Not Found")
 
 class FzfServer(HTTPServer):
     def __init__(self, server_address, handler_class):
