@@ -1,22 +1,33 @@
 #!/bin/bash
 
 VIEWER=${BROWSER:-librewolf}
+SERVER_URL="http://localhost:6713"
 
-CHOICE=$(python3 main.py "" | fzf \
+# 1. Start the Python server in the background if it isn't already running!
+if ! curl -s "$SERVER_URL/" > /dev/null; then
+    echo "Starting Codeforces background server..."
+    python3 main.py &
+    sleep 1 # Give it a second to boot up
+fi
+
+# 2. Run FZF talking only to the ultra-fast server
+CHOICE=$(curl -s "$SERVER_URL/" | fzf \
 	--disabled \
-	--header 'Search (e.g. r:1200-1600 t:dp !t:graphs)' \
-	--bind 'change:reload(python3 main.py {q})' \
-	--bind 'ctrl-r:execute(python3 main.py -r {q})' \
+	--header 'Search (e.g. r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
+	--bind 'change:reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/")' \
+	--bind 'ctrl-r:execute-silent(curl -s "'$SERVER_URL'/?ref=true")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/")' \
+	--bind 'ctrl-s:execute-silent(curl -s "'$SERVER_URL'/?toggle=true")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/")' \
 	--delimiter ':' \
+	--accept-nth 1 \
 	--preview 'echo "Problem Info: {1}"' \
 	--expect=enter)
-# --bind 'enter:become(xdg-open "https://codeforces.com/problemset/problem/"{1} >/dev/null 2>&1)' \
 
-#
+# 3. Handle the selection
 key=$(head -1 <<<"$CHOICE")
-file=$(head -2 <<<"$CHOICE" | tail -1)
-file=$(echo $file | cut -f1 -d':')
-file="https://codeforces.com/problemset/problem/${file}"
-if [[ -n "$file" ]]; then
-	swaymsg exec " ${VIEWER} \"${file}\" "
+url=$(head -2 <<<"$CHOICE" | tail -1)
+
+if [[ -n "$url" ]]; then
+    # We stripped everything after the colon, so $url is just "contestId/index"
+	full_url="https://codeforces.com/problemset/problem/${url}"
+	swaymsg exec " ${VIEWER} \"${full_url}\" "
 fi
