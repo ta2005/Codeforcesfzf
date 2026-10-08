@@ -8,19 +8,22 @@ SERVER_PID=""
 if ! curl -s "$SERVER_URL/" > /dev/null; then
     echo "Starting Codeforces background server..."
     python3 cf_svr.py &>/dev/null &
-    sleep 0.1
+    sleep 0.5
     SERVER_PID="$!"
 fi
 
-CHOICE=$(curl -s "${SERVER_URL}/search" | fzf \
+CHOICE=$(curl -s "${SERVER_URL}/search" | fzf-tmux -p 80%,80% \
+	--style=full \
 	--disabled \
-	--header 'Search (e.g. r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
+	--footer 'Search (e.g. r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
 	--bind 'change:reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--bind 'ctrl-r:execute-silent(curl -s "'$SERVER_URL'/refresh")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--bind 'ctrl-s:execute-silent(curl -s "'$SERVER_URL'/toggle")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--delimiter ':' \
 	--accept-nth 1 \
-	--preview 'echo "Problem Info: {1}"' \
+	--preview 'curl -s "'$SERVER_URL'/preview?q={}"' \
+	--preview 'curl -s -G --data-urlencode id={1} "'$SERVER_URL'/preview"' \
+	--preview-window 'right,55%,wrap' \
 	--expect=enter)
 
 # the key to be later used to open the problem in tmux 
@@ -32,7 +35,6 @@ if [[ -n "$url" ]]; then
 	swaymsg exec " ${VIEWER} \"${full_url}\" "
 fi
 
-if [[ -n "$SERVER_PID" ]];then
-    kill "$SERVER_PID"
-fi
-
+# if [[ -n "$SERVER_PID" ]];then
+#     kill "$SERVER_PID"
+# fi

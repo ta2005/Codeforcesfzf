@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/env python
 from pathlib import Path
 import urllib.request
 import urllib.parse as up
@@ -6,8 +6,9 @@ import json
 import re
 import shlex
 import sqlite3
-import sys
 import argparse
+import bs4
+from  problem_parser import parse_problem
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 cache_dir = Path.home() / ".cache" / "codeforces_fzf"
@@ -25,6 +26,7 @@ def getResponse():
 
 def parse_search_query(query_str: str) -> dict:
     # of couse 800 and 3500 must be max and min rating
+    # this is of course shitty design
     know_tags = [
         "2_sat",
         "binary_search",
@@ -268,6 +270,7 @@ class DataBase:
                 res += f"{contest_id}/{index}:{name}\n"
         return res
 
+
     def close(self):
         self.con.close()
 
@@ -294,8 +297,23 @@ class RequestHandler(BaseHTTPRequestHandler):
             search = qr.get("q", [""])[0]
             self.send_response(200)
             self.end_headers()
-            results = self.server.db.search_problems(search)
+            results = self.server.db.search_problems(search.lower())
             self.wfile.write(results.encode("utf-8"))
+        elif path == "/preview":
+            qr = up.parse_qs(parsed_url.query)
+            problem_id = qr.get("id", [""])[0]
+            if not re.fullmatch(r"\d+/[A-Za-z0-9]+", problem_id):
+                body = "Invalid problem id"
+            else:
+                try:
+                    body = parse_problem(problem_id)
+                    if not isinstance(body, str):          # if your parser returns a dict
+                        body = json.dumps(body, indent=2)
+                except Exception as e:
+                    body = f"Couldn't load statement ({e}).\nPress Enter to open in browser."
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(body.encode("utf-8"))
         else:
             self.send_response(404)
             self.end_headers()
