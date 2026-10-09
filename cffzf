@@ -21,8 +21,7 @@ CHOICE=$(curl -s "${SERVER_URL}/search" | fzf-tmux -p 80%,80% \
 	--bind 'ctrl-s:execute-silent(curl -s "'$SERVER_URL'/toggle")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--delimiter ':' \
 	--accept-nth 1 \
-	--preview 'curl -s "'$SERVER_URL'/preview?q={}"' \
-	--preview 'curl -s -G --data-urlencode id={1} "'$SERVER_URL'/preview"' \
+	--preview 'curl -s -G --data-urlencode id={1} "'$SERVER_URL'/preview" | glow' \
 	--preview-window 'right,55%,wrap' \
 	--expect=enter)
 

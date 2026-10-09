@@ -72,4 +72,5 @@ def get_content(soup, _class=''):
 def concat_contents(ls):
     return ''.join([str(i) for i in ls])
 
-# print(parse_problem("2275/H"))
+if __name__ == "__main__":
+    print(parse_problem("2275/H"))

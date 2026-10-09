@@ -306,7 +306,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 body = "Invalid problem id"
             else:
                 try:
-                    body = parse_problem(problem_id)
+                    parsed = parse_problem(problem_id)
+                    body = f"## {parsed['title']}\n\n**Time Limit:** {parsed['timeLimit']['value']}{parsed['timeLimit']['unit']}\n\n{parsed['statement']}"
                     if not isinstance(body, str):          # if your parser returns a dict
                         body = json.dumps(body, indent=2)
                 except Exception as e:
