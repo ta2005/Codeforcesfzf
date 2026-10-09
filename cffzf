@@ -2,30 +2,30 @@
 
 VIEWER=${BROWSER:-librewolf}
 SERVER_URL="http://localhost:6713"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SERVER_PID=""
-
+# 1. Start Codeforces background server if not already running
 if ! curl -s "$SERVER_URL/" > /dev/null; then
     echo "Starting Codeforces background server..."
-    python3 cf_svr.py &>/dev/null &
-    sleep 0.5
-    SERVER_PID="$!"
+    python3 "$SCRIPT_DIR/server.py" &>/dev/null &
+    sleep 0.6
 fi
 
-CHOICE=$(curl -s "${SERVER_URL}/search" | fzf-tmux -p 80%,80% \
+# 2. Launch fzf-tmux interface
+CHOICE=$(curl -s "${SERVER_URL}/search" | fzf-tmux -p 85%,85% \
 	--style=full \
 	--disabled \
-	--footer 'Search (e.g. r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
+	--footer 'Search (r:1200 t:dp) | Ctrl-S: Tags | Ctrl-R: Refresh' \
 	--bind 'change:reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--bind 'ctrl-r:execute-silent(curl -s "'$SERVER_URL'/refresh")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--bind 'ctrl-s:execute-silent(curl -s "'$SERVER_URL'/toggle")+reload(curl -s -G --data-urlencode q={q} "'$SERVER_URL'/search")' \
 	--delimiter ':' \
 	--accept-nth 1 \
-	--preview 'curl -s -G --data-urlencode id={1} "'$SERVER_URL'/preview" | glow' \
+	--preview 'curl -s -G --data-urlencode id={1} "'$SERVER_URL'/preview" | (glow -s dark -w 80 - 2>/dev/null || cat)' \
 	--preview-window 'right,55%,wrap' \
 	--expect=enter)
 
-# the key to be later used to open the problem in tmux 
+# 3. Handle selection: open in browser
 key=$(head -1 <<<"$CHOICE")
 url=$(head -2 <<<"$CHOICE" | tail -1)
 
@@ -33,7 +33,3 @@ if [[ -n "$url" ]]; then
 	full_url="https://codeforces.com/problemset/problem/${url}"
 	swaymsg exec " ${VIEWER} \"${full_url}\" "
 fi
-
-# if [[ -n "$SERVER_PID" ]];then
-#     kill "$SERVER_PID"
-# fi
